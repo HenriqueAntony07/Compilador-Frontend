@@ -94,6 +94,7 @@ function compile(){
   if(target==='next')  files=genNext(name,html,css,js,meta,report);
   if(target==='react') files=genReact(name,html,css,js,meta,report);
   if(target==='php')   files=genPhp(name,html,css,js,meta,report);
+  if(target==='wordpress') files=genWordPress(name,html,css,js,meta,report);
   if(target==='clean') files=genClean(name,html,css,js,report);
   generated=files;
   renderFiles();
@@ -354,6 +355,272 @@ function genClean(name,html,css,js,report){
     'README.md':`# ${name}\nHTML limpo gerado pelo Front Compiler.`,
     'docs/relatorio-compilador.md':report
   };
+}
+
+// ─── GERADOR WORDPRESS (Local WP) ─────────────────────────────────────────────
+// Gera um ZIP compatível com o Local WP:
+//   wp-content/themes/<name>/  — tema completo
+//   <name>.sql                 — banco de dados com conteúdo da página
+function genWordPress(name,html,css,js,meta,report){
+  const files={};
+  const slug=name.replace(/[^a-z0-9-]/g,'-');
+  const themeName=slug;
+
+  // ── Detecta regiões semânticas para montar o tema ──────────────────────────
+  const doc=new DOMParser().parseFromString(`<body>${html}</body>`,'text/html');
+  const headerEl=doc.querySelector('header');
+  const footerEl=doc.querySelector('footer');
+  const navEl=doc.querySelector('nav');
+
+  // Monta o header.php (topo + abertura do body)
+  const headerHtml=headerEl
+    ? headerEl.outerHTML
+    : (navEl ? navEl.outerHTML : '<!-- sem header detectado -->');
+
+  // Monta o footer.php (rodapé + fechamento do body)
+  const footerHtml=footerEl
+    ? footerEl.outerHTML
+    : '<!-- sem footer detectado -->';
+
+  // Conteúdo principal: tudo exceto header e footer
+  let bodyHtml=html;
+  if(headerEl) bodyHtml=bodyHtml.replace(headerEl.outerHTML,'');
+  if(footerEl) bodyHtml=bodyHtml.replace(footerEl.outerHTML,'');
+  bodyHtml=bodyHtml.trim();
+
+  // ── style.css — identidade do tema (obrigatório pelo WordPress) ─────────────
+  files[`wp-content/themes/${themeName}/style.css`]=
+`/*
+Theme Name: ${name}
+Theme URI: https://github.com/
+Author: Front Compiler
+Author URI: #
+Description: Tema gerado automaticamente pelo Front Compiler a partir de HTML/CSS/JS.
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: ${slug}
+*/
+
+${css}
+`;
+
+  // ── functions.php — registra scripts e estilos ──────────────────────────────
+  files[`wp-content/themes/${themeName}/functions.php`]=
+`<?php
+function ${slug.replace(/-/g,'_')}_enqueue() {
+    wp_enqueue_style( '${slug}-style', get_stylesheet_uri(), array(), '1.0.0' );
+${js && js.trim() ? `    wp_enqueue_script( '${slug}-script', get_template_directory_uri() . '/assets/main.js', array(), '1.0.0', true );` : ''}
+}
+add_action( 'wp_enqueue_scripts', '${slug.replace(/-/g,'_')}_enqueue' );
+
+// Suporte a recursos essenciais do WordPress
+function ${slug.replace(/-/g,'_')}_setup() {
+    add_theme_support( 'title-tag' );
+    add_theme_support( 'post-thumbnails' );
+    add_theme_support( 'html5', array( 'search-form', 'comment-form', 'comment-list', 'gallery', 'caption' ) );
+    register_nav_menus( array(
+        'primary' => __( 'Menu Principal', '${slug}' ),
+    ) );
+}
+add_action( 'after_setup_theme', '${slug.replace(/-/g,'_')}_setup' );
+?>
+`;
+
+  // ── header.php ──────────────────────────────────────────────────────────────
+  files[`wp-content/themes/${themeName}/header.php`]=
+`<!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+  <meta charset="<?php bloginfo('charset'); ?>">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<?php wp_body_open(); ?>
+
+${headerHtml}
+`;
+
+  // ── footer.php ──────────────────────────────────────────────────────────────
+  files[`wp-content/themes/${themeName}/footer.php`]=
+`${footerHtml}
+
+<?php wp_footer(); ?>
+</body>
+</html>
+`;
+
+  // ── index.php — template padrão (mostra o conteúdo da home) ─────────────────
+  files[`wp-content/themes/${themeName}/index.php`]=
+`<?php get_header(); ?>
+
+<main id="main-content">
+  <?php if ( have_posts() ) : while ( have_posts() ) : the_post(); ?>
+    <div class="wp-entry">
+      <?php the_content(); ?>
+    </div>
+  <?php endwhile; else : ?>
+    <!-- Conteúdo estático gerado pelo Front Compiler -->
+${bodyHtml.split('\n').map(l=>'    '+l).join('\n')}
+  <?php endif; ?>
+</main>
+
+<?php get_footer(); ?>
+`;
+
+  // ── page.php — template para páginas estáticas ───────────────────────────────
+  files[`wp-content/themes/${themeName}/page.php`]=
+`<?php get_header(); ?>
+
+<main id="main-content">
+  <?php while ( have_posts() ) : the_post(); ?>
+    <article id="page-<?php the_ID(); ?>">
+      <?php the_content(); ?>
+    </article>
+  <?php endwhile; ?>
+</main>
+
+<?php get_footer(); ?>
+`;
+
+  // ── front-page.php — home page com o HTML convertido ────────────────────────
+  files[`wp-content/themes/${themeName}/front-page.php`]=
+`<?php get_header(); ?>
+
+<!-- Conteúdo gerado pelo Front Compiler -->
+${bodyHtml.split('\n').map(l=>'  '+l).join('\n')}
+
+<?php get_footer(); ?>
+`;
+
+  // ── screenshot.png placeholder (1200x900 esperado pelo WordPress) ────────────
+  // SVG mínimo como placeholder (WP aceita png; aqui deixamos nota no README)
+
+  // ── JS do cliente ────────────────────────────────────────────────────────────
+  if(js && js.trim()){
+    files[`wp-content/themes/${themeName}/assets/main.js`]=js;
+  }
+
+  // ── .sql — banco de dados mínimo para o Local WP importar ───────────────────
+  // Gera um WordPress com uma página "Home" contendo o bodyHtml como conteúdo
+  const now=new Date().toISOString().replace('T',' ').split('.')[0];
+  const escaped=bodyHtml.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
+  const siteTitle=name.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+  files[`${slug}.sql`]=
+`-- Banco gerado pelo Front Compiler para uso com Local WP
+-- Importar com: wp db import ${slug}.sql
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+SET foreign_key_checks = 0;
+SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
+
+-- Cria tabelas base do WordPress
+CREATE TABLE IF NOT EXISTS \`wp_options\` (
+  \`option_id\` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  \`option_name\` varchar(191) NOT NULL DEFAULT '',
+  \`option_value\` longtext NOT NULL,
+  \`autoload\` varchar(20) NOT NULL DEFAULT 'yes',
+  PRIMARY KEY (\`option_id\`),
+  UNIQUE KEY \`option_name\` (\`option_name\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`wp_posts\` (
+  \`ID\` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  \`post_author\` bigint(20) unsigned NOT NULL DEFAULT 0,
+  \`post_date\` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  \`post_date_gmt\` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  \`post_content\` longtext NOT NULL,
+  \`post_title\` text NOT NULL,
+  \`post_excerpt\` text NOT NULL,
+  \`post_status\` varchar(20) NOT NULL DEFAULT 'publish',
+  \`comment_status\` varchar(20) NOT NULL DEFAULT 'open',
+  \`ping_status\` varchar(20) NOT NULL DEFAULT 'open',
+  \`post_password\` varchar(255) NOT NULL DEFAULT '',
+  \`post_name\` varchar(200) NOT NULL DEFAULT '',
+  \`to_ping\` text NOT NULL,
+  \`pinged\` text NOT NULL,
+  \`post_modified\` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  \`post_modified_gmt\` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
+  \`post_content_filtered\` longtext NOT NULL,
+  \`post_parent\` bigint(20) unsigned NOT NULL DEFAULT 0,
+  \`guid\` varchar(255) NOT NULL DEFAULT '',
+  \`menu_order\` int(11) NOT NULL DEFAULT 0,
+  \`post_type\` varchar(20) NOT NULL DEFAULT 'post',
+  \`post_mime_type\` varchar(100) NOT NULL DEFAULT '',
+  \`comment_count\` bigint(20) NOT NULL DEFAULT 0,
+  PRIMARY KEY (\`ID\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`wp_postmeta\` (
+  \`meta_id\` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  \`post_id\` bigint(20) unsigned NOT NULL DEFAULT 0,
+  \`meta_key\` varchar(255) DEFAULT NULL,
+  \`meta_value\` longtext,
+  PRIMARY KEY (\`meta_id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Configurações básicas do site
+INSERT INTO \`wp_options\` (\`option_name\`, \`option_value\`, \`autoload\`) VALUES
+('siteurl',       'http://${slug}.local',   'yes'),
+('blogname',      '${siteTitle}',           'yes'),
+('blogdescription','Gerado pelo Front Compiler','yes'),
+('template',      '${themeName}',           'yes'),
+('stylesheet',    '${themeName}',           'yes'),
+('page_on_front', '1',                      'yes'),
+('show_on_front', 'page',                   'yes'),
+('permalink_structure', '/%postname%/',     'yes');
+
+-- Página Home com o conteúdo HTML convertido
+INSERT INTO \`wp_posts\`
+  (\`ID\`,\`post_author\`,\`post_date\`,\`post_date_gmt\`,\`post_content\`,\`post_title\`,\`post_excerpt\`,\`post_status\`,\`comment_status\`,\`ping_status\`,\`post_name\`,\`to_ping\`,\`pinged\`,\`post_modified\`,\`post_modified_gmt\`,\`post_content_filtered\`,\`post_parent\`,\`guid\`,\`menu_order\`,\`post_type\`,\`post_mime_type\`,\`comment_count\`)
+VALUES
+  (1,1,'${now}','${now}','${escaped}','Home','','publish','closed','closed','home','','','${now}','${now}','',0,'http://${slug}.local/?page_id=1',0,'page','',0);
+`;
+
+  // ── README com instruções de importação ──────────────────────────────────────
+  files['README.md']=
+`# ${siteTitle} — Tema WordPress
+
+Gerado pelo Front Compiler. Compatível com **Local WP** (localwp.com).
+
+## Como importar no Local WP
+
+1. Abra o **Local WP**
+2. Arraste este arquivo \`.zip\` para dentro do Local, ou clique em **⊕ → Import site**
+3. Siga os prompts (domínio sugerido: \`${slug}.local\`)
+4. Após importar, vá em **WP Admin → Aparência → Temas** e ative o tema **${siteTitle}**
+5. Vá em **Configurações → Leitura** e defina a página estática como "Home"
+
+## Estrutura gerada
+
+\`\`\`
+wp-content/
+  themes/${themeName}/
+    style.css          ← identidade do tema + seus CSS
+    functions.php      ← registra scripts e suporte a features WP
+    header.php         ← topo do site (header/nav detectados)
+    footer.php         ← rodapé detectado
+    index.php          ← template padrão
+    front-page.php     ← home com o HTML convertido
+    page.php           ← template para páginas
+    assets/
+      main.js          ← seu JavaScript (se houver)
+
+${slug}.sql            ← banco de dados com a página Home já criada
+\`\`\`
+
+## Notas
+
+- O tema usa o CSS original sem alterações
+- O banco já cria a página "Home" com o conteúdo do seu site
+- Após ativar o tema, personalize via **Aparência → Editor de temas** no WP Admin
+`;
+
+  files['docs/relatorio-compilador.md']=report;
+  return files;
 }
 
 // ─── HELPER: INDENTAÇÃO DE JSX ────────────────────────────────────────────────
