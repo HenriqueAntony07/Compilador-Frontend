@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compilador Frontend</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">M</span><div><strong>Front Compiler</strong><small>HTML/CSS/JS -> projetos reais</small></div></div>
+      <nav class="steps">
+        <a href="#entrada" class="active">01 Entrada</a><a href="#config">02 Destino</a><a href="#saida">03 Saida</a><a href="#docs">04 Documentacao</a>
+      </nav>
+      
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Compilador util para criadores de sites</p>
+          <h1>Transforme seu front-end em <span>Next.js</span>, <span>React</span> ou <span>PHP</span>.</h1>
+          <p>Coloque seu HTML, CSS e JavaScript. O sistema analisa a estrutura, separa componentes, gera os arquivos finais e permite baixar o projeto para abrir no VS Code.</p>
+        </div>
+        <div class="hero-card">
+          <b>Pipeline</b>
+          <ol><li>Lexer: tags, classes e scripts</li><li>Parser: arvore DOM</li><li>Semantica: header, hero, cards, footer</li><li>Gerador: projeto final</li></ol>
+        </div>
+      </header>
+
+      <section id="entrada" class="panel grid-2">
+        <div>
+          <h2>Entrada do projeto</h2>
+          <p>Cole seu site ou carregue arquivos separados. Para ZIP, use a versao com backend ou cole os arquivos principais.</p>
+          <div class="tabs"><button class="tab active" data-tab="html">HTML</button><button class="tab" data-tab="css">CSS</button><button class="tab" data-tab="js">JS</button></div>
+          <textarea id="htmlInput" class="editor active" spellcheck="false"></textarea>
+          <textarea id="cssInput" class="editor" spellcheck="false"></textarea>
+          <textarea id="jsInput" class="editor" spellcheck="false"></textarea>
+          <div class="file-row"><label>Carregar HTML <input id="htmlFile" type="file" accept=".html,.htm"></label><label>Carregar CSS <input id="cssFile" type="file" accept=".css"></label><label>Carregar JS <input id="jsFile" type="file" accept=".js"></label></div>
+        </div>
+        <div>
+          <h2>Preview</h2>
+          <iframe id="preview" title="Preview do site"></iframe>
+          <div class="actions"><button id="refreshBtn" class="secondary">Atualizar preview</button><button id="sampleBtn" class="ghost">Usar exemplo</button></div>
+        </div>
+      </section>
+
+      <section id="config" class="panel">
+        <h2>Destino da compilacao</h2>
+        <div class="cards">
+          <label class="option selected"><input type="radio" name="target" value="next" checked><b>Next.js App Router</b><span>Cria app/page.jsx, components e globals.css.</span></label>
+          <label class="option"><input type="radio" name="target" value="react"><b>React + Vite</b><span>Cria src/App.jsx, components e styles.</span></label>
+          <label class="option"><input type="radio" name="target" value="php"><b>PHP Front-end</b><span>Cria index.php, includes/header.php e footer.php.</span></label>
+          <label class="option"><input type="radio" name="target" value="clean"><b>HTML limpo</b><span>Organiza HTML, CSS e JS em pastas.</span></label>
+        </div>
+        <div class="formline"><label>Nome do projeto <input id="projectName" value="site-convertido"></label><label><input type="checkbox" id="splitComponents" checked> Separar componentes automaticamente</label><label><input type="checkbox" id="keepComments" checked> Gerar relatorio do compilador</label></div>
+        <button id="compileBtn" class="primary">Compilar projeto</button>
+      </section>
+
+      <section id="saida" class="panel output-layout">
+        <div>
+          <h2>Arquivos gerados</h2>
+          <div id="fileTree" class="file-tree"></div>
+          <div class="actions"><button id="downloadZip" class="primary" disabled>Baixar ZIP final</button><button id="copyAll" class="secondary" disabled>Copiar codigo atual</button></div>
+        </div>
+        <div>
+          <h2>Codigo compilado</h2>
+          <select id="fileSelect"></select>
+          <pre id="codeOutput"><code>Nenhum projeto compilado ainda.</code></pre>
+        </div>
+      </section>
+
+      <section id="docs" class="panel docs-panel">
+        <h2>Documentacao tecnica</h2>
+        <div id="report"></div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
